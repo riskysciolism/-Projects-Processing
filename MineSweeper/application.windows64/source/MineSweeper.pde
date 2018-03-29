@@ -1,38 +1,67 @@
-// -----TODO-----
-// * make game start and game over screen
-// * make one able to specify the number of mines
-// * make textSize relative to number of cells
+ // -----TODO-----
 // * refractor the code
 // 
 //
 
-int rows      = 10;
-int columns   = 10;
+int rows = 20;
+int mines = 25;
+int cellWidth;
 
 Menu menu = new Menu();
 
-Cell cellArray[][] = new Cell[rows][columns];
-ArrayList<String> cordArray = new ArrayList();
+Cell cellArray[][]; 
+
+void makeMines() {
+  ArrayList<int[]> mineOptions = new ArrayList();
+  
+  for(int i = 0; i < rows; i++) {
+    for(int j = 0; j < rows; j++) {
+      mineOptions.add(new int[]{i,j});
+    }
+  }
+  int setMines = 0;
+  
+  while(setMines < menu.mines) {
+    
+    int randomIndex = floor(random(0, mineOptions.size()));
+    
+    int[] currentCords = mineOptions.get(randomIndex);
+    
+    cellArray[currentCords[0]][currentCords[1]].mine = true;
+    
+    mineOptions.remove(randomIndex);
+    
+    setMines++;
+  }
+  println(setMines);
+}
 
 void makeGrid() {
+  cellArray = new Cell[rows][rows];
   //Create cells and position them
-  int cellWidth = floor(width / rows);
+    cellWidth = floor(width / rows);
+ 
   for (int i = 0; i < rows; i++) {
-    for (int j = 0; j < columns; j++) {
+    for (int j = 0; j < rows; j++) {
       cellArray[i][j] = new Cell(j * cellWidth, i * cellWidth, cellWidth);
     }
   }
+  makeMines();
+
   //Count mine neighbours for each cell in advance
   for (int i = 0; i < rows; i++) {
-    for (int j = 0; j < columns; j++) {
+    for (int j = 0; j < rows; j++) {
       numberOfNeighbours(i, j);
     }
   }
 }
 
+
+
 void drawGrid() {
+  strokeWeight(1);
   for (int i = 0; i < rows; i++) {
-    for (int j = 0; j < columns; j++) {
+    for (int j = 0; j < rows; j++) {
       Cell currentCell = cellArray[i][j];
       fill(currentCell.cellColor);
       stroke(1);
@@ -64,7 +93,7 @@ void numberOfNeighbours(int y, int x) {
   int neighbourCount = 0;
   for (int i = -1; i < 2; i++) {
     for (int j = -1; j < 2; j++) {
-      if (x + j > -1 && x + j < columns && y + i > -1 && y + i < rows) {
+      if (x + j > -1 && x + j < rows && y + i > -1 && y + i < rows) {
         if (cellArray[y + i][x + j].getHasMine()) {
           neighbourCount++;
         }
@@ -81,19 +110,17 @@ void numberOfNeighbours(int y, int x) {
 void floodAlgorithm(int y, int x) {
 
   cellArray[y][x].reveal();
-  cordArray.add(y+""+x);
 
   for (int i = -1; i < 2; i++) {
     for (int j = -1; j < 2; j++) {
-      if (x + j > -1 && x + j < columns && y + i > -1 && y + i < rows) {
-        if (cellArray[y + i][x + j].neighbours == 0) {
+      if (x + j > -1 && x + j < rows && y + i > -1 && y + i < rows) {
+        if (cellArray[y + i][x + j].neighbours == 0 && !cellArray[y + i][x + j].revealed) {
           int yNew = y + i;
           int xNew = x + j;
-
-          if (!cordArray.contains(yNew+""+xNew)) {
-            cellArray[yNew][xNew].reveal();
-            floodAlgorithm(yNew, xNew);
-          }
+          
+          cellArray[yNew][xNew].reveal();
+          floodAlgorithm(yNew, xNew);
+          
         } else {
           cellArray[y + i][x + j].reveal();
         }
@@ -114,9 +141,6 @@ void gameState() {
 
   case Game:
     drawGrid();
-    if(won()) {
-       setCurrentView(State.Won);
-    } 
     break;
 
   case Won:
@@ -126,6 +150,12 @@ void gameState() {
   case Lost:
     menu.drawMenu();
     break;
+  }
+}
+
+void mouseDragged() {
+  if (getCurrentView() == State.Options) {
+    menu.mouseFunction();
   }
 }
 
@@ -159,7 +189,7 @@ void mousePressed() {
       }
     }
   } else if (getCurrentView() == State.Options) {
-
+    menu.mouseFunction();
     currentFunction = menu.getButtonFunction(mouseX, mouseY);
     println(currentFunction);
     if (currentFunction != null) {
@@ -206,7 +236,6 @@ void mousePressed() {
         break;
       }
     }
-  
   } else if (getCurrentView() == State.Won) {
 
     currentFunction = menu.getButtonFunction(mouseX, mouseY);
@@ -234,7 +263,7 @@ void mousePressed() {
     }
   } else if (getCurrentView() == State.Game) {
     for (int i = 0; i < rows; i++) {
-      for (int j = 0; j < columns; j++) {
+      for (int j = 0; j < rows; j++) {
         if (mouseX > cellArray[i][j].x && mouseX < cellArray[i][j].x + cellArray[i][j].w
           && mouseY > cellArray[i][j].y && mouseY < cellArray[i][j].y + cellArray[i][j].w) {
 
@@ -245,7 +274,7 @@ void mousePressed() {
               // hit a mine --> GameOver!
               if (currentCell.getHasMine()) {
                 for (int k = 0; k < rows; k++) {
-                  for (int l = 0; l < columns; l++) {
+                  for (int l = 0; l < rows; l++) {
                     cellArray[k][l].reveal();
                   }
                 }
@@ -258,7 +287,10 @@ void mousePressed() {
                 }
                 currentCell.reveal();
                 //Checks if all fields which arent mines are revealed --> won
-              }    
+                if (won()) {
+                  setCurrentView(State.Won);
+                }
+              }
             }
           } else {
             //flag cell
@@ -278,9 +310,10 @@ void mousePressed() {
 
 boolean won() {
   for (int i = 0; i < rows; i++) {
-    for (int j = 0; j < columns; j++) {
+    for (int j = 0; j < rows; j++) {
       Cell currentCell = cellArray[i][j];
-      if(!currentCell.hasMine() & !currentCell.revealed) {
+      if (!currentCell.mine && !currentCell.revealed) {
+        println(currentCell.x + ", " + currentCell.y);
         return false;
       }
     }
